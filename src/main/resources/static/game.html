@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Title</title>
+<link
+	href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/css/bootstrap.css"
+	rel="stylesheet" />
+<style>
+body {
+	background-color: #f5f5f5;
+}
+
+#main-content {
+	max-width: 940px;
+	padding: 2em 3em;
+	margin: 0 auto 20px;
+	background-color: #fff;
+	border: 1px solid #e5e5e5;
+	-webkit-border-radius: 5px;
+	-moz-border-radius: 5px;
+	border-radius: 5px;
+}
+
+.from {
+	width: 120px;
+}
+
+.timeStamp {
+	width: 220px;
+}
+</style>
+<script
+	src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.js"></script>
+<script
+	src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@5.0.0/bundles/stomp.umd.js"></script>
+<script
+	src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+<script>
+	var stompClient = null;
+	var numOfGameMove = 0;
+	var isManualPlay = true;
+	var isFirstToPlay;
+	const VALID_ADDED_VALUES = [ 1, 0, -1 ];
+
+	function setConnected(connected) {
+		$("#manualGame").prop("disabled", connected);
+		$("#automaticGame").prop("disabled", connected);
+		$("#disconnect").prop("disabled", !connected);
+
+		if (connected) {
+			$("#responses").show();
+			$("#messages").html("");
+		}
+		numOfGameMove = 0;
+	}
+
+	function frameHandler(frame) {
+
+		setConnected(true);
+
+		console.log('Connected: ' + frame);
+
+		stompClient.subscribe('/user/queue/game_moves', function(message) {
+			showMessage(message.body);
+		});
+
+		stompClient.subscribe('/user/queue/notifications', function(message) {
+
+			handleNotifications(message.body);
+		});
+
+		stompClient.subscribe('/user/queue/errors', function(message) {
+			alert("Error: " + message.body);
+		});
+
+		stompClient.publish({
+			destination : "/app/after_connect"
+		});
+
+		//------------------------------------------------------------------------
+
+		if (isManualPlay == false) { // if automatic play
+
+			var jsonStr = getURL("/is_first_to_play");
+
+			var jsonObj = $.parseJSON(jsonStr);
+
+			isFirstToPlay = jsonObj['firstToPlay'];
+
+			if (isFirstToPlay) {
+
+				generateAutomaticNumber();
+			}
+		}
+	}
+
+	function getURL(url) {
+		return $.ajax({
+			type : "GET",
+			url : url,
+			cache : false,
+			async : false
+		}).responseText;
+	}
+
+	function handleNotifications(message) {
+
+		var msg = JSON.parse(message);
+
+		var text = msg['text'];
+		var code = msg['code'];
+
+		switch (code) {
+		case "GAME_IS_BUSY_WITH_TWO_PLAYERS":
+		case "OTHER_USER_DISCONNECTED":
+		case "YOU_WON":
+		case "YOU_LOST":
+			disconnect();
+			alert("notification: " + text);
+			break;
+		default:
+			break;
+		}
+
+		console.log("notification: " + message);
+	}
+
+	function onSocketClose() {
+		if (stompClient !== null) {
+			stompClient.deactivate();
+		}
+		setConnected(false);
+		console.log("Socket was closed. Setting connected to false!")
+	}
+
+	function connect() {
+		stompClient = new window.StompJs.Client({
+			webSocketFactory : function() {
+				return new WebSocket("ws://localhost:8080/websocket");
+			}
+		});
+		stompClient.onConnect = function(frame) {
+			frameHandler(frame)
+		};
+		stompClient.onWebsocketClose = function() {
+			onSocketClose();
+		};
+
+		stompClient.activate();
+	}
+
+	function manualGame() {
+
+		isManualPlay = true;
+		connect();
+		$("#send").prop("disabled", false);
+	}
+
+	function automaticGame() {
+
+		isManualPlay = false;
+		connect();
+		$("#send").prop("disabled", true);
+	}
+
+	function disconnect() {
+
+		if (stompClient !== null) {
+			stompClient.deactivate();
+		}
+
+		setConnected(false);
+		
+		$("#send").prop("disabled", true);
+
+		console.log("Disconnected");
+	}
+
+	function sendMessage(number) {
+
+		if (stompClient == null) {
+
+			alert("Please connect to Game before Send.");
+
+			return;
+		}
+
+		if (numOfGameMove == 0) {
+
+			stompClient.publish({
+				destination : "/app/send",
+				body : JSON.stringify({
+					'resultingNumber' : number
+				})
+			});
+
+		} else {
+
+			stompClient.publish({
+				destination : "/app/send",
+				body : JSON.stringify({
+					'added' : number
+				})
+			});
+		}
+	}
+
+	function generateAutomaticNumber(resultingNumberPlusAddedDividedBy3) {
+
+		if (resultingNumberPlusAddedDividedBy3 == 1) {
+
+			disconnect();
+
+			return;
+		}
+
+		var sendNum;
+
+		if (numOfGameMove == 0) {
+
+			sendNum = randomInteger(10, 100);
+
+		} else {
+
+			for (i = 0; i < VALID_ADDED_VALUES.length; i++) {
+
+				if ((resultingNumberPlusAddedDividedBy3 + VALID_ADDED_VALUES[i]) % 3 == 0) {
+
+					sendNum = VALID_ADDED_VALUES[i] + "";
+				}
+			}
+		}
+
+		sendMessage(sendNum);
+	}
+
+	function randomInteger(min, max) {
+
+		return Math.floor(Math.random() * (max - min + 1)) + min;
+	}
+
+	function showMessage(message) {
+
+		++numOfGameMove;
+
+		var msg = JSON.parse(message);
+
+		var resultingNumber = msg['resultingNumber'];
+		var added = msg['added'];
+		var resultingNumberPlusAdded = "";
+		var resultingNumberPlusAddedDividedBy3 = "";
+
+		if (added == null) {
+
+			added = "";
+			$("#responses").prepend(
+					"<tr>" + "<td class='timeStamp'>" + resultingNumber
+							+ "</td>" + "<td class='timeStamp'></td>"
+							+ "<td class='from'></td>" + "<td></td>"
+							+ "<td></td>" + "<td></td>" + "<td></td>"
+							+ "<td></td>" + "<td></td>" + "</tr>");
+
+		} else {
+
+			resultingNumberPlusAdded = resultingNumber + added;
+			resultingNumberPlusAddedDividedBy3 = resultingNumberPlusAdded / 3;
+
+			$("#responses").prepend(
+					"<tr>" + "<td class='timeStamp'>" + resultingNumber
+							+ "</td>" + "<td class='timeStamp'>&#43;</td>"
+							+ "<td class='from'>" + added + "</td>"
+							+ "<td class='timeStamp'>&#61;</td>"
+							+ "<td class='timeStamp'>"
+							+ resultingNumberPlusAdded + "</td>"
+							+ "<td class='timeStamp'>&#47;</td>"
+							+ "<td class='timeStamp'>3</td>"
+							+ "<td class='timeStamp'>&#61;</td>"
+							+ "<td class='timeStamp'>"
+							+ resultingNumberPlusAddedDividedBy3 + "</td>"
+							+ "</tr>");
+		}
+
+		if (isManualPlay == false) {
+
+			if (isFirstToPlay) {
+
+				if (numOfGameMove % 2 == 0) {
+
+					generateAutomaticNumber(resultingNumberPlusAddedDividedBy3)
+				}
+			} else {
+
+				if (numOfGameMove % 2 == 1) {
+
+					if (resultingNumberPlusAddedDividedBy3 == "") {
+						resultingNumberPlusAddedDividedBy3 = resultingNumber;
+					}
+
+					generateAutomaticNumber(resultingNumberPlusAddedDividedBy3)
+				}
+			}
+		}
+	}
+
+	$(function() {
+		$("form").on('submit', function(e) {
+			e.preventDefault();
+		});
+		$("#manualGame").click(function() {
+			manualGame();
+		});
+		$("#automaticGame").click(function() {
+			automaticGame();
+		});
+		$("#disconnect").click(function() {
+			disconnect();
+		});
+		$("#send").click(function() {
+			sendMessage($("#number").val());
+		});
+		$("document").ready(function() {
+			$("#send").prop("disabled", true);
+		});
+	});
+</script>
+</head>
+<body>
+	<noscript>
+		<h2 style="color: #ff0000">Seems your browser doesn't support
+			Javascript! Websocket relies on Javascript being enabled. Please
+			enable Javascript and reload this page!</h2>
+	</noscript>
+	<div class="container" id="main-content">
+		<div class="row">
+			<div class="col-md-10">
+				<form class="form-inline">
+					<div class="form-group">
+						<label for="connect">Game of Three:</label>
+						<button class="btn btn-default" id="manualGame" type="submit">Start
+							Manual Game</button>
+						<button class="btn btn-default" id="automaticGame" type="submit">Start
+							Automatic Game</button>
+						<!-- <button class="btn btn-default" id="connectSockJS" type="submit">ConnectSockJS</button> -->
+					</div>
+				</form>
+			</div>
+			<div class="col-md-2">
+				<form class="form-inline">
+					<div class="form-group">
+						<button class="btn btn-default" disabled="disabled"
+							id="disconnect" type="submit">Disconnect</button>
+					</div>
+				</form>
+			</div>
+		</div>
+		<div class="row">
+			<div class="col-md-12">
+				<form class="form-inline">
+					<div class="form-group">
+						<label for="from">Enter number:</label> <input
+							class="form-control" id="number"
+							placeholder="Your number here..." type="text">
+					</div>
+					<button class="btn btn-default" id="send" type="submit">Send</button>
+				</form>
+			</div>
+		</div>
+		<div class="row">
+			<div class="col-md-12">
+				<table class="table table-striped" id="responses">
+					<thead>
+						<tr>
+							<th>Game Moves</th>
+						</tr>
+					</thead>
+					<tbody id="messages">
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</div>
+</body>
+</html>
