@@ -119,6 +119,11 @@ body {
 			disconnect();
 			alert("notification: " + text);
 			break;
+		case "WAIT_OTHER_USER_JOIN_GAME":
+			if (isManualPlay) {
+				alert("notification: " + text);
+			}
+			break;
 		default:
 			break;
 		}

@@ -160,6 +160,11 @@ public class GameImpl implements Game {
 
 			socketSendOutMessagesService.sendGameMoveToUser(user, new GameMove(lastResultingNumber, null));
 		}
+		
+		if (numOfUsers == 1) {
+			
+			socketSendOutMessagesService.sendNotificationToUser(user, NotificationEnum.WAIT_OTHER_USER_JOIN_GAME);
+		}
 	}
 	
 	@Override
