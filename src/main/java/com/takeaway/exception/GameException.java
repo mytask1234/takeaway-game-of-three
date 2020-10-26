@@ -9,6 +9,8 @@ public class GameException extends RuntimeException {
 	 */
 	private static final long serialVersionUID = -7472766231549032854L;
 
+	private String errorCode;
+	
 	public GameException() {
 
 	}
@@ -19,11 +21,13 @@ public class GameException extends RuntimeException {
 	
 	public GameException(ErrorEnum errorEnum) {
 		super(errorEnum.getMessage());
+		errorCode = errorEnum.getCode();
 	}
 	
 	public GameException(ErrorEnum errorEnum, Object... args) {
 		
 		super(String.format(errorEnum.getMessage(), args));
+		errorCode = errorEnum.getCode();
 	}
 
 	public GameException(Throwable cause) {
@@ -36,9 +40,14 @@ public class GameException extends RuntimeException {
 	
 	public GameException(ErrorEnum errorEnum, Throwable cause, Object... args) {
 		super(String.format(errorEnum.getMessage(), args), cause);
+		errorCode = errorEnum.getCode();
 	}
 
 	public GameException(String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace) {
 		super(message, cause, enableSuppression, writableStackTrace);
+	}
+
+	public String getErrorCode() {
+		return errorCode;
 	}
 }

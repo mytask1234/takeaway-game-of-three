@@ -71,7 +71,8 @@ body {
 		});
 
 		stompClient.subscribe('/user/queue/errors', function(message) {
-			alert("Error: " + message.body);
+			
+			handleErrors(message.body);
 		});
 
 		stompClient.publish({
@@ -129,6 +130,22 @@ body {
 		}
 
 		console.log("notification: " + message);
+	}
+	
+	function handleErrors(message) {
+
+		var msg = JSON.parse(message);
+
+		var text = msg['errorMessage'];
+		var code = msg['errorCode'];
+
+		switch (code) {
+		default:
+			alert("Error: " + text);
+			break;
+		}
+
+		console.log("Error: " + message);
 	}
 
 	function onSocketClose() {

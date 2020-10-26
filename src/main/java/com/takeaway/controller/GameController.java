@@ -12,9 +12,11 @@ import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.takeaway.dto.ErrorMessageResponseDto;
 import com.takeaway.dto.FirstUserToPlayResponseDto;
 import com.takeaway.dto.GameMoveDto;
 import com.takeaway.enums.NotificationEnum;
+import com.takeaway.exception.GameException;
 import com.takeaway.game.Game;
 import com.takeaway.service.SocketSendOutMessagesService;
 
@@ -64,15 +66,17 @@ public class GameController {
 
 	@MessageExceptionHandler
 	@SendToUser("/queue/errors")
-	public String handleException(Throwable t, SimpMessageHeaderAccessor ha) {
+	public ErrorMessageResponseDto handleException(Throwable t, SimpMessageHeaderAccessor ha) {
 
 		String user = ha.getUser().getName();
 
 		LOGGER.debug("user={}", user);
 
-		LOGGER.error(t.getMessage(), t);
-
-		return t.getMessage();
+		ErrorMessageResponseDto errorMessageResponseDto = new ErrorMessageResponseDto(t);
+		
+		LOGGER.error(errorMessageResponseDto.toString(), t);
+		
+		return errorMessageResponseDto;
 	}
 	
 	/************************** Rest endpoint *******************************/
