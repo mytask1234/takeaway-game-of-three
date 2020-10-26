@@ -16,7 +16,6 @@ import com.takeaway.dto.ErrorMessageResponseDto;
 import com.takeaway.dto.FirstUserToPlayResponseDto;
 import com.takeaway.dto.GameMoveDto;
 import com.takeaway.enums.NotificationEnum;
-import com.takeaway.exception.GameException;
 import com.takeaway.game.Game;
 import com.takeaway.service.SocketSendOutMessagesService;
 
